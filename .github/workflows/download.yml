@@ -1,0 +1,69 @@
+name: Download Subscriptions
+
+on:
+  schedule:
+    # 每小时运行一次（UTC 时间）
+    - cron: '0 * * * *'
+  push:
+    paths:
+      # 当工作流文件本身有改动时自动运行
+      - '.github/workflows/download.yml'
+  workflow_dispatch:
+    # 支持手动触发
+
+jobs:
+  download:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write   # 允许推送代码
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set date variables
+        run: |
+          echo "TODAY=$(date +%Y%m%d)" >> $GITHUB_ENV
+          echo "YEAR=$(date +%Y)" >> $GITHUB_ENV
+          echo "MONTH=$(date +%m)" >> $GITHUB_ENV
+
+      - name: Download from anaer/Sub (fixed URL)
+        run: |
+          mkdir -p sub
+          if curl -f -o sub/latest.tmp "https://github.com/anaer/Sub/raw/main/clash.yaml"; then
+            mv sub/latest.tmp sub/latest.yml
+          else
+            rm -f sub/latest.tmp
+          fi
+
+      - name: Download from free-nodes/clashfree (date-specific)
+        run: |
+          mkdir -p free-nodes
+          URL="https://github.com/free-nodes/clashfree/raw/main/clash${TODAY}.yml"
+          if curl -f -o free-nodes/latest.tmp "$URL"; then
+            mv free-nodes/latest.tmp free-nodes/latest.yml
+          else
+            rm -f free-nodes/latest.tmp
+          fi
+
+      - name: Download from node.nodefree.me (date-specific)
+        run: |
+          mkdir -p nodefree
+          URL="https://node.nodefree.me/${YEAR}/${MONTH}/${TODAY}.yaml"
+          if curl -f -o nodefree/latest.tmp "$URL"; then
+            mv nodefree/latest.tmp nodefree/latest.yml
+          else
+            rm -f nodefree/latest.tmp
+          fi
+
+      - name: Commit and push if changes
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git add sub/latest.yml 2>/dev/null || true
+          git add free-nodes/latest.yml 2>/dev/null || true
+          git add nodefree/latest.yml 2>/dev/null || true
+          if ! git diff --quiet --staged; then
+            git commit -m "Update subscriptions [skip ci]"
+            git push
+          fi
