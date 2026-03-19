@@ -31,14 +31,16 @@ jobs:
         run: |
           mkdir -p sub
           echo "=== Downloading from anaer/Sub ==="
-          HTTP_CODE=$(curl -s -o sub/latest.tmp -w "%{http_code}" "https://raw.githubusercontent.com/anaer/Sub/main/clash.yaml")
-          echo "HTTP status: $HTTP_CODE"
-          echo "File size: $(stat -c%s sub/latest.tmp 2>/dev/null || echo '0') bytes"
-          if [ "$HTTP_CODE" = "200" ] && [ -s sub/latest.tmp ]; then
+          HTTP_CODE=$(curl -sL -o sub/latest.tmp -w "%{http_code}" "https://raw.githubusercontent.com/anaer/Sub/main/clash.yaml" 2>&1)
+          echo "Response/HTTP status: $HTTP_CODE"
+          SIZE=$(stat -c%s sub/latest.tmp 2>/dev/null || echo '0')
+          echo "File size: $SIZE bytes"
+          if [ "$HTTP_CODE" = "200" ] && [ "$SIZE" -gt 0 ]; then
             mv sub/latest.tmp sub/latest.yml
             echo "Download successful"
           else
-            echo "Download failed or file empty"
+            echo "Download failed or file empty - attempting with verbose..."
+            curl -vL "https://raw.githubusercontent.com/anaer/Sub/main/clash.yaml" 2>&1 | head -30
             rm -f sub/latest.tmp
           fi
 
@@ -48,14 +50,16 @@ jobs:
           URL="https://raw.githubusercontent.com/free-nodes/clashfree/main/clash${TODAY}.yml"
           echo "=== Downloading from free-nodes ==="
           echo "URL: $URL"
-          HTTP_CODE=$(curl -s -o free-nodes/latest.tmp -w "%{http_code}" "$URL")
-          echo "HTTP status: $HTTP_CODE"
-          echo "File size: $(stat -c%s free-nodes/latest.tmp 2>/dev/null || echo '0') bytes"
-          if [ "$HTTP_CODE" = "200" ] && [ -s free-nodes/latest.tmp ]; then
+          HTTP_CODE=$(curl -sL -o free-nodes/latest.tmp -w "%{http_code}" "$URL" 2>&1)
+          echo "Response/HTTP status: $HTTP_CODE"
+          SIZE=$(stat -c%s free-nodes/latest.tmp 2>/dev/null || echo '0')
+          echo "File size: $SIZE bytes"
+          if [ "$HTTP_CODE" = "200" ] && [ "$SIZE" -gt 0 ]; then
             mv free-nodes/latest.tmp free-nodes/latest.yml
             echo "Download successful"
           else
-            echo "Download failed or file empty"
+            echo "Download failed or file empty - attempting with verbose..."
+            curl -vL "$URL" 2>&1 | head -30
             rm -f free-nodes/latest.tmp
           fi
 
