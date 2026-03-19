@@ -31,16 +31,20 @@ jobs:
         run: |
           mkdir -p sub
           echo "=== Downloading from anaer/Sub ==="
-          HTTP_CODE=$(curl -sL -o sub/latest.tmp -w "%{http_code}" "https://raw.githubusercontent.com/anaer/Sub/main/clash.yaml" 2>&1)
-          echo "Response/HTTP status: $HTTP_CODE"
-          SIZE=$(stat -c%s sub/latest.tmp 2>/dev/null || echo '0')
-          echo "File size: $SIZE bytes"
-          if [ "$HTTP_CODE" = "200" ] && [ "$SIZE" -gt 0 ]; then
-            mv sub/latest.tmp sub/latest.yml
-            echo "Download successful"
-          else
-            echo "Download failed or file empty - attempting with verbose..."
-            curl -vL "https://raw.githubusercontent.com/anaer/Sub/main/clash.yaml" 2>&1 | head -30
+          for i in 1 2 3; do
+            echo "Attempt $i..."
+            HTTP_CODE=$(curl -sL --max-time 30 -o sub/latest.tmp -w "%{http_code}" "https://raw.githubusercontent.com/anaer/Sub/main/clash.yaml")
+            SIZE=$(stat -c%s sub/latest.tmp 2>/dev/null || echo '0')
+            echo "HTTP: $HTTP_CODE, Size: $SIZE bytes"
+            if [ "$HTTP_CODE" = "200" ] && [ "$SIZE" -gt 100 ]; then
+              mv sub/latest.tmp sub/latest.yml
+              echo "Download successful"
+              break
+            fi
+            sleep 2
+          done
+          if [ ! -f sub/latest.yml ]; then
+            echo "All download attempts failed"
             rm -f sub/latest.tmp
           fi
 
@@ -50,16 +54,20 @@ jobs:
           URL="https://raw.githubusercontent.com/free-nodes/clashfree/main/clash${TODAY}.yml"
           echo "=== Downloading from free-nodes ==="
           echo "URL: $URL"
-          HTTP_CODE=$(curl -sL -o free-nodes/latest.tmp -w "%{http_code}" "$URL" 2>&1)
-          echo "Response/HTTP status: $HTTP_CODE"
-          SIZE=$(stat -c%s free-nodes/latest.tmp 2>/dev/null || echo '0')
-          echo "File size: $SIZE bytes"
-          if [ "$HTTP_CODE" = "200" ] && [ "$SIZE" -gt 0 ]; then
-            mv free-nodes/latest.tmp free-nodes/latest.yml
-            echo "Download successful"
-          else
-            echo "Download failed or file empty - attempting with verbose..."
-            curl -vL "$URL" 2>&1 | head -30
+          for i in 1 2 3; do
+            echo "Attempt $i..."
+            HTTP_CODE=$(curl -sL --max-time 30 -o free-nodes/latest.tmp -w "%{http_code}" "$URL")
+            SIZE=$(stat -c%s free-nodes/latest.tmp 2>/dev/null || echo '0')
+            echo "HTTP: $HTTP_CODE, Size: $SIZE bytes"
+            if [ "$HTTP_CODE" = "200" ] && [ "$SIZE" -gt 100 ]; then
+              mv free-nodes/latest.tmp free-nodes/latest.yml
+              echo "Download successful"
+              break
+            fi
+            sleep 2
+          done
+          if [ ! -f free-nodes/latest.yml ]; then
+            echo "All download attempts failed"
             rm -f free-nodes/latest.tmp
           fi
 
@@ -69,14 +77,20 @@ jobs:
           URL="https://node.nodefree.me/${YEAR}/${MONTH}/${TODAY}.yaml"
           echo "=== Downloading from nodefree ==="
           echo "URL: $URL"
-          HTTP_CODE=$(curl -s -o nodefree/latest.tmp -w "%{http_code}" "$URL")
-          echo "HTTP status: $HTTP_CODE"
-          echo "File size: $(stat -c%s nodefree/latest.tmp 2>/dev/null || echo '0') bytes"
-          if [ "$HTTP_CODE" = "200" ] && [ -s nodefree/latest.tmp ]; then
-            mv nodefree/latest.tmp nodefree/latest.yml
-            echo "Download successful"
-          else
-            echo "Download failed or file empty"
+          for i in 1 2 3; do
+            echo "Attempt $i..."
+            HTTP_CODE=$(curl -sL --max-time 30 -o nodefree/latest.tmp -w "%{http_code}" "$URL")
+            SIZE=$(stat -c%s nodefree/latest.tmp 2>/dev/null || echo '0')
+            echo "HTTP: $HTTP_CODE, Size: $SIZE bytes"
+            if [ "$HTTP_CODE" = "200" ] && [ "$SIZE" -gt 100 ]; then
+              mv nodefree/latest.tmp nodefree/latest.yml
+              echo "Download successful"
+              break
+            fi
+            sleep 2
+          done
+          if [ ! -f nodefree/latest.yml ]; then
+            echo "All download attempts failed"
             rm -f nodefree/latest.tmp
           fi
 
@@ -84,18 +98,13 @@ jobs:
         run: |
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
-          echo "=== Files before commit ==="
+          echo "=== Summary ==="
           ls -la sub/latest.yml free-nodes/latest.yml nodefree/latest.yml 2>/dev/null || true
-          echo "sub/latest.yml size: $(stat -c%s sub/latest.yml 2>/dev/null || echo 'N/A')"
-          echo "free-nodes/latest.yml size: $(stat -c%s free-nodes/latest.yml 2>/dev/null || echo 'N/A')"
-          echo "nodefree/latest.yml size: $(stat -c%s nodefree/latest.yml 2>/dev/null || echo 'N/A')"
-          git add sub/latest.yml 2>/dev/null || true
-          git add free-nodes/latest.yml 2>/dev/null || true
-          git add nodefree/latest.yml 2>/dev/null || true
+          git add sub/latest.yml free-nodes/latest.yml nodefree/latest.yml 2>/dev/null || true
           if ! git diff --quiet --staged; then
-            echo "Changes detected, committing..."
             git commit -m "Update subscriptions [skip ci]"
             git push
+            echo "Changes committed and pushed"
           else
             echo "No changes to commit"
           fi
